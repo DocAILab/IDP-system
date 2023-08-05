@@ -1,0 +1,1 @@
+./configuration/100000-small-modi.txt filter=lfs diff=lfs merge=lfs -text
