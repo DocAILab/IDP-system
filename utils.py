@@ -66,7 +66,7 @@ schemas_dict = {
 sensitive_words = {'秘密', '此件不公开','不得擅自扩散','机密','保密','版权所有','复制','传播','外传'}
 
 
-def judge_pdf(file_path):
+def judge_text_pdf(file_path):
     """
         判断是否为文字类pdf。（即是否可以直接使用pdfplumber读取文字内容）
     :param file_path: 文件路径
@@ -127,6 +127,47 @@ def parse_pdf_with_ocr(file_path, ocr, max_page=-1):
         for res in result:
             if res[1][0] != '':
                 texts.append(res[1][0])
+    texts = '\n'.join(texts)
+    return texts
+
+
+def parse_docx(file_path, ocr=None, parse_picture=False):
+    """
+        docx文件内容提取，提取文字段落、表格内容、图片ocr文本（可选）
+    :param file_path: 文件路径
+    :param ocr: ocr模型
+    :param parse_picture: 是否对文件中的图片进行ocr
+    :return: 提取出的文本内容，str
+    """
+    doc = docx.Document(file_path)
+    texts = list()
+    # 遍历文档中的段落
+    for para in doc.paragraphs:
+        texts.append(para.text)
+
+    # 遍历文档中的表格
+    for table in doc.tables:
+        # 遍历表格中的行
+        for row in table.rows:
+            # 遍历行中的单元格
+            for cell in row.cells:
+                texts.append(cell.text)
+
+    if parse_picture and not ocr is None:
+        # 遍历文档中的图片
+        dict_rel = doc.part._rels  # rels其实是个目录
+        for rel in dict_rel:
+            rel = dict_rel[rel]
+            if "image" in rel.target_ref:
+                bytesdata = rel.target_part.blob
+                imgarray = np.frombuffer(bytesdata, dtype=np.uint8)
+                img = cv2.imdecode(imgarray, cv2.IMREAD_ANYCOLOR)
+                # 从图片中提取文字
+                result = ocr.ocr(img, cls=False)
+                result = result[0]
+                for res in result:
+                    if res[1][0] != '':
+                        texts.append(res[1][0])
 
     texts = '\n'.join(texts)
     return texts
@@ -134,7 +175,7 @@ def parse_pdf_with_ocr(file_path, ocr, max_page=-1):
 
 def get_text(file_path, ocr, max_page=-1):
     """
-        获取pdf文字内容。
+        获取pdf/docx文字内容。
     :param file_path: 文件路径
     :param ocr: OCR模型
     :param max_page: 最大抽取页数。-1时全部抽取
@@ -143,9 +184,12 @@ def get_text(file_path, ocr, max_page=-1):
     content = ''
     try:
         if judge_pdf(file_path):
-            content = parse_pdf(file_path, max_page=max_page)
+            if judge_text_pdf(file_path):
+                content = parse_pdf(file_path, max_page=max_page)
+            else:
+                content = parse_pdf_with_ocr(file_path, ocr, max_page=max_page)
         else:
-            content = parse_pdf_with_ocr(file_path, ocr, max_page=max_page)
+            content = parse_docx(file_path, ocr, parse_picture=False)
     except Exception as e:
         print(pathlib.Path(file_path).stem + '[Failed Get Content] : ' + str(e))
 
@@ -265,7 +309,43 @@ def have_chinese(text):
     return False
 
 
+def judge_pdf(file_path):
+    """
+        判断一个文件是不是pdf文件
+    :param file_path: 文件路径，str
+    :return: 是否是pdf文件，bool
+    """
+    return file_path.lower().endswith(".pdf")
+
+
 def get_title(file_path, ocr, table_engine):
+    """
+        根据文件类型获取文件的标题
+    :param file_path: 文件路径
+    :param ocr: OCR模型
+    :param table_engine: 版面识别模型
+    :return: 标题，str
+    """
+    if judge_pdf(file_path):
+        return get_pdf_title(file_path, ocr, table_engine)
+    else:
+        return get_docx_title(file_path)
+
+
+def get_docx_title(file_path):
+    """
+        把docx文件的第一个文字段当作标题
+    :param file_path: 文件路径
+    :return: 文件的标题，str
+    """
+    doc = docx.Document(file_path)
+    for para in doc.paragraphs:
+        if len(para.text.strip()) > 0:
+            return para.text.strip()[:15]
+    return ""
+
+
+def get_pdf_title(file_path, ocr, table_engine):
     """
         从文件首页提取标题。
     :param file_path: pdf文件路径
@@ -313,7 +393,7 @@ def get_title(file_path, ocr, table_engine):
 def get_filename(file_path, ocr, table_engine):
     """
         获取文件名/标题：当文件名包含中文时，返回文件名；否则，从文件内抽取标题，返回标题。
-    :param file_path: pdf文件路径
+    :param file_path: pdf/docx文件路径
     :param ocr: OCR模型
     :param table_engine: 版面识别模型
     :return:原文件名，新文件名/标题，str
@@ -448,9 +528,9 @@ def get_file_MG_level(extraction_result_list, total_schema_length):
     return ret_MG_level
 
 
-def get_table(file_path, save_dir):
+def get_pdf_table(file_path, save_dir):
     """
-        识别并提取表格到excel中。（目前只支持文字类pdf的表格抽取）
+        识别并提取表格到excel中。（pdf文件中目前只支持文字类pdf的表格抽取）
     :param file_path: pdf文件路径
     :param save_dir: excel存储路径
     :return: 无
@@ -475,7 +555,7 @@ def get_table(file_path, save_dir):
 
 def read_file(file_path, ocr, table_engine, table_extract=False, table_dir=None):
     """
-        读入pdf文件，获取文字内容
+        读入pdf/docx文件，获取文字内容
     :param file_path: 文件绝对路径
     :param ocr: OCR模型
     :param table_engine: 版面识别模型
@@ -488,21 +568,62 @@ def read_file(file_path, ocr, table_engine, table_extract=False, table_dir=None)
         raise ValueError('file path is not exist!', file_path)
     if not os.path.isfile(file_path):
         raise ValueError('not a correct file path!', file_path)
-    if '.pdf' not in file_path and '.PDF' not in file_path:
-        raise ValueError('not a supported file type! (PDF)', file_path)
+    if not file_path.lower().endswith(".pdf") and not file_path.lower().endswith(".docx"):
+        raise ValueError('not a supported file type! (pdf/docx)', file_path)
 
-    # OCR标注无标题文件的标题
+    # 获取无标题文件的标题
     ori_filename, filename = get_filename(file_path, ocr, table_engine)  # 不包含后缀，且删除非法字符的文件名
 
     # 获取文字内容
     content = get_text(file_path, ocr)
 
-    # 抽取表格
-    if judge_pdf(file_path) and table_extract:
-        os.makedirs(table_dir, exist_ok=True)
-        get_table(file_path, table_dir)
+    # 单独提取表格
+    if table_extract:
+        extract_table(file_path, table_dir)
 
     return ori_filename, filename, content
+
+
+def get_docx_table(file_path, save_dir):
+    """
+        识别并提取表格到excel中。
+    :param file_path: 文件路径
+    :param save_dir: excel存储路径
+    :return: 无
+    """
+    try:
+        doc = docx.Document(file_path)
+        wb = Workbook()  # 建一个新的工作簿
+        sht = wb.active  # 获取第一个sheet
+        for table in doc.tables:
+            # 获取表格的行
+            tb_rows = table.rows
+            # 读取每一行内容
+            for i in range(len(tb_rows)):
+                row_data = []
+                row_cells = tb_rows[i].cells
+                # 读取每一行单元格内容
+                for cell in row_cells:
+                    row_data.append(cell.text)  # 单元格内容
+                sht.append(row_data)  # 逐行写到excel中
+        wb.save(os.path.join(save_dir, pathlib.Path(file_path).stem + '.xlsx'))
+    except Exception as e:
+        print('Table extraction failed!', e)
+
+
+def extract_table(file_path, table_dir):
+    """
+        单独提取文件中的表格
+    :param file_path: 文件路径
+    :param table_dir: 存储的表格路径
+    :return: 无
+    """
+    os.makedirs(table_dir, exist_ok=True)
+    if judge_pdf(file_path):
+        if judge_text_pdf(file_path):
+            get_pdf_table(file_path, table_dir)
+    else:
+        get_docx_table(file_path, table_dir)
 
 
 def get_domain_type(text, embeddings, domain_keywords, intersection):
