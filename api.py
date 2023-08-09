@@ -1,6 +1,5 @@
 from paddlenlp import Taskflow
 from uie_schemas import schemas_dict_education, schemas_dict_education_D, sensitive_words
-#from test_dict import schemas_dict_education_test_short
 
 class Info_Extraction:
     def __init__(self, schemas_dict= schemas_dict_education, model= 'uie-m-base', task_path= None, use_fast= True):
@@ -176,7 +175,10 @@ def extraction_classify(field, extract_result, schema_dict= schemas_dict_educati
         print("分类结果: ", *classify, sep= " ")
     return classify
 
-if __name__ == '__main__':
+def uie_example():
+    """
+    uie接口使用示例（Info_Extraction、sensitive_word、extraction_classify）
+    """
     # debug测试以及使用示例
     
     # 初始化uie模型,加载字典
