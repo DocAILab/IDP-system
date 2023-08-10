@@ -1,13 +1,16 @@
 """
 更新领域词和交集词表（创建领域词库、旧领域添加新词、添加新领域、删除某领域）。
 输入：
-    operation: 要进行的操作，支持：create：创建领域词库；add：增加新领域/扩充旧领域词库；delete：删除某领域；check：查看领域信息
-    delete_domain: 要删除的领域词（operation为delete时输入）
+    operation: 要进行的操作，支持：create：创建领域词库；add：增加新领域/扩充旧领域词库；delete1：删除某领域；delete2: 删除某领域内某词 check：查看领域信息；change:修改领域名
+    delete_domain: 要删除的领域（operation为delete1和delete2时输入）
+    delet_keywords: 要删除的领域词(operation为delete2时输入)
+    old_domain: 修改前领域名（operation为change时输入）
+    new_domain: 修改后领域名（operation为change时输入）
     file_paths: 添加的文件夹路径（operation为create、add时输入）
-    save_path: 结果存储文件夹（operation为create、add、delete时输入）
+    save_path: 结果存储文件夹（operation为create、add、delete1、delete2、change时输入）
     embedding_path: 词嵌入文件目录，对应100000-small-modi.txt文件（operation为create、add时输入）
-    keywords_path: 领域关键词文件路径，domain_keywords.txt（operation为add、delete、check时输入）
-    intersection_path: 领域间关键词交集文件路径，intersection.txt（operation为add、delete、check时输入）
+    keywords_path: 领域关键词文件路径，domain_keywords.txt（operation为add、delete1、delete2、change、check时输入）
+    intersection_path: 领域间关键词交集文件路径，intersection.txt（operation为add、delete1、delete2、change、check时输入）
 输出：
     base.log: 记录基本信息的文件，保存有各领域非交关键词提取个数、交集词提取个数
     domain_keywords.txt: 记录各领域关键词（及对应词向量）的文件，格式为：dict{domain{keyword: [embedding]}}
@@ -15,10 +18,74 @@
 """
 
 import os
-import paddleocr
-from paddleocr import PPStructure
 import jieba
-from utils import get_embedding_table, get_embedding, get_filename, get_domain_keywords, get_intersection
+
+
+def get_filename(file_path, ocr, table_engine):
+    """
+        获取文件名/标题：当文件名包含中文时，返回文件名；否则，从文件内抽取标题，返回标题。
+    :param file_path: pdf文件路径
+    :param ocr: OCR模型
+    :param table_engine: 版面识别模型
+    :return:原文件名，新文件名/标题，str
+    """
+
+def get_embedding_table(embedding_path):
+    """
+        读入词嵌入表（腾讯词向量精简版，10万词，200维）
+    :param embedding_path: 词嵌入表路径
+    :return: 词嵌入表，dict
+    """
+    embeddings = {}
+    mean_vec = [0.0] * 200  # 默认值，当遇到OOV词时，初始化为该向量
+    with open(embedding_path, 'r', encoding='utf-8') as f:
+        f.readline()
+        for line in f.readlines():
+            line = line.strip().split()
+            word = line[0]
+            embedding = list(map(lambda x: float(x), line[1:]))
+            embeddings[word] = embedding
+
+    embeddings['mean_vector'] = mean_vec
+
+    return embeddings
+
+
+def get_embedding(word, embeddings):
+    """
+        获取特定词向量。若匹配到了指定词，返回对应的词向量，否则，返回默认词向量（全0向量）。
+    :param word: 待获取词向量的词，str
+    :param embeddings: 词嵌入表，dict
+    :return: 词嵌入的向量，list；是否匹配到了该词，bool；
+    """
+    if word in embeddings:
+        return embeddings[word], True  # matched = True
+    else:
+        return embeddings['mean_vector'], False  # matched = False
+
+
+def get_domain_keywords(keywords_path):
+    """
+        读入领域关键词字典。（格式：{领域：{关键词: [词向量]}}）
+    :param keywords_path: 领域关键词表路径
+    :return: 领域关键词表，dict
+    """
+    domain_keywords = {}
+    with open(keywords_path, 'r', encoding='utf-8') as f:
+        domain_keywords = eval(f.read())
+    return domain_keywords
+
+
+def get_intersection(intersection_path):
+    """
+        读入领域关键词交集（格式：{关键词}）
+    :param intersection_path: 交集词表路径
+    :return: 交集词表，set
+    """
+    intersection = set()
+    with open(intersection_path, 'r') as f:
+        intersection = eval(f.read())
+    return intersection
 
 def get_all_filename(paths, ocr, table_engine):
     """
@@ -164,6 +231,36 @@ def delete(domain_keywords, domain_name):
     del domain_keywords[domain_name]
     return True
 
+def delete2(domain_keywords, domain_name, domain_words):
+    """
+            删除指定领域的词表。
+        :param domain_keywords: 领域关键词表
+        :param domain_name: 要删除的领域，str
+        :return: 若领域存在并删除成功，则返回True；否则返回False
+        """
+    if domain_name not in domain_keywords:
+        return False
+    elif domain_words not in domain_keywords[domain_name]:
+        return False
+    del domain_keywords[domain_name][domain_words]
+    if domain_words in intersection:
+      intersection.remove(domain_words)
+    return True
+
+def change(domain_keywords, old_domain, new_domain):
+    """
+            修改领域名。
+        :param domain_keywords: 领域关键词表
+        :param old_domain: 要更改的领域，str
+        :param new_domain: 更改后的领域，str
+        :return: 若领域存在并修改成功，则返回True；否则返回False
+        """
+    if old_domain not in domain_keywords:
+        return False
+    domain_keywords[new_domain]=domain_keywords[old_domain]
+    del domain_keywords[old_domain]
+    return True
+
 
 def check(domain_keywords, intersection):
     """
@@ -249,9 +346,15 @@ def save(save_path, domain_keywords, intersection):
     #               'P': r'/usr/local/etc/ie_flow/partfile/学校',
     #               'F': r'/usr/local/etc/ie_flow/partfile/运输',
     #               'S': r'/usr/local/etc/ie_flow/partfile/政府数据'}  # 文件夹路径
+
+
+
 if __name__ == "__main__":
-    operation = 'add'  # 要进行的操作，支持：create：创建领域词库；add：增加新领域/扩充旧领域词库；delete：删除某领域；check：查看领域信息
-    delete_domain = r''  # operation为delete时，输入要删除的领域词
+    operation = 'delete2'  # 要进行的操作，支持：create：创建领域词库；add：增加新领域/扩充旧领域词库；delete：删除某领域；check：查看领域信息
+    delete_domain = 'C'  # operation为delete1时，输入要删除的领域
+    delete_keywords = '打车' # operation为delete2时，输入要删除的领域词
+    old_domain = ''
+    new_domain = ''
     file_paths = {'Q': r'/usr/local/etc/ie_flow/partfile/医疗',#industry personal sechool government
                   'C': r'/usr/local/etc/ie_flow/partfile/工业',
                   'P': r'/usr/local/etc/ie_flow/partfile/学校',
@@ -300,15 +403,43 @@ if __name__ == "__main__":
         print([(domain, len(words)) for domain, words in new_domain_keywords.items()])
         print('Done!')
 
-    elif operation == 'delete':
+    elif operation == 'delete1':
         # 删除某个领域
-        print('[delete] Init...')
+        print('[delete1] Init...')
         domain_keywords = get_domain_keywords(keywords_path)
         intersection = get_intersection(intersection_path)
         if delete(domain_keywords, delete_domain):
             save(save_path, domain_keywords, intersection)
         else:
             print('领域名：“{}”不存在！'.format(delete_domain))
+
+        print('更新后领域个数：{}'.format(len(domain_keywords)))
+        print([(domain, len(words)) for domain, words in domain_keywords.items()])
+        print('Done!')
+
+    elif operation == 'delete2':
+        # 删除某个领域内的领域词
+        print('[delete2] Init...')
+        domain_keywords = get_domain_keywords(keywords_path)
+        intersection = get_intersection(intersection_path)
+        if delete2(domain_keywords, delete_domain,delete_keywords):
+            save(save_path, domain_keywords, intersection)
+        else:
+            print('领域名：“{}”不存在！'.format(delete_domain))
+
+        print('更新后领域个数：{}'.format(len(domain_keywords)))
+        print([(domain, len(words)) for domain, words in domain_keywords.items()])
+        print('Done!')
+
+    elif operation == 'change':
+        # 修改领域名
+        print('[change] Init...')
+        domain_keywords = get_domain_keywords(keywords_path)
+        intersection = get_intersection(intersection_path)
+        if change(domain_keywords, old_domain,new_domain ):
+            save(save_path, domain_keywords, intersection)
+        else:
+            print('领域名：“{}”不存在！'.format(old_domain))
 
         print('更新后领域个数：{}'.format(len(domain_keywords)))
         print([(domain, len(words)) for domain, words in domain_keywords.items()])
@@ -327,4 +458,3 @@ if __name__ == "__main__":
 
     else:
         print('输入的操作无效：{}'.format(operation))
-
