@@ -22,8 +22,9 @@ import time
 
 from paddleocr import PPStructure, paddleocr
 
-from update_keywords_table import save, create, add, delete, delete2, change, check
+from update_keywords_table import save, create, add, delete, delete2, change, check_shuju
 from utils import get_embedding_table, get_domain_keywords, get_intersection
+
 
 
 class Update_Keywords:
@@ -96,7 +97,7 @@ class Update_Keywords:
         print('[delete2] Init...')
         domain_keywords = get_domain_keywords(self.keywords_path)
         intersection = get_intersection(self.intersection_path)
-        if delete2(domain_keywords, delete_domain,delete_keywords):
+        if delete2(domain_keywords,intersection, delete_domain,delete_keywords):
             save(self.save_path, domain_keywords, intersection)
         else:
             print('领域名：“{}”不存在！'.format(delete_domain))
@@ -119,17 +120,17 @@ class Update_Keywords:
         print([(domain, len(words)) for domain, words in domain_keywords.items()])
         print('Done!')
 
-
-   def check(self):
+    def check(self):
         # 查看领域信息
         print('[check] Init...')
         domain_keywords = get_domain_keywords(self.keywords_path)
         intersection = get_intersection(self.intersection_path)
-        domain_num, intersection_num, domain_info =check(domain_keywords, intersection)
+        domain_num, intersection_num, domain_info =check_shuju(domain_keywords, intersection)
 
         print('领域个数：{}'.format(domain_num))
         print('交集词个数：{}'.format(intersection_num))
         print('各领域下关键词个数：{}'.format(domain_info))
+
 
 
 def encryption(mode, index):
