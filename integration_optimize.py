@@ -205,7 +205,11 @@ if __name__ == '__main__':
                               det_model_dir="../configuration/ocr/ch_PP-OCRv4_det_infer",
                               rec_model_dir="../configuration/ocr/ch_PP-OCRv4_rec_infer",
                               cls_model_dir="../configuration/ocr/ch_ppocr_mobile_v2.0_cls_infer")  # 初始化ocr模型
-    table_engine = PPStructure(table=False, ocr=False, show_log=True)  # 初始化版面识别模型
+    table_engine = PPStructure(table=False, ocr=False, show_log=True,
+                               layout_model_dir="../configuration/ocr/layout/picodet_lcnet_x1_0_fgd_layout_cdla_infer",
+                               table_model_dir="../configuration/ocr/table/ch_ppstructure_mobile_v2.0_SLANet_infer",
+                               det_model_dir="../configuration/ocr/ch_PP-OCRv4_det_infer",
+                               rec_model_dir="../configuration/ocr/ch_PP-OCRv4_rec_infer")  # 初始化版面识别模型
     uie_dict = {}  # 初始化UIE模型
     for domain in schemas_dict.keys():
         uie_dict[domain] = {}
