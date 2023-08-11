@@ -5,6 +5,8 @@
 import os
 import json
 import pathlib
+
+import docx
 import numpy as np
 import cv2
 import paddleocr
