@@ -373,8 +373,8 @@ def sort(file_hash1, file_hash2, dict1, dict2):
 
 def get_file_finger(file_dir, out_dir):
     """
-        计算文件指纹并保存至相应目录
-    :param file_dir: 输入文件路径，可为目录或单个文件 str
+        计算文件指纹
+    :param file_dir: 输入文件路径，可为单个文件 str
     :param out_dir: 输出路径，为目录 str
     :return: 无
     """
@@ -420,8 +420,8 @@ def get_file_finger(file_dir, out_dir):
 
 def check_file_finger(file_dir, check_file_dir, out_dir):
     """
-        检查一批文件是否为敏感文件
-    :param file_dir: 输入文件路径，可为目录或单个文件 str
+        检查一个文件是否与某指纹相似
+    :param file_dir: 输入文件路径，可为单个文件 str
     :param check_file_dir: 输入已保存指纹的路径 str
     :param out_dir: 输出路径，为目录 str
     :return: 是否为敏感文件 bool
@@ -462,7 +462,10 @@ def check_file_finger(file_dir, check_file_dir, out_dir):
              table_extract=table_extract, table_dir=table_dir, print_info=True)
     # 读取 + 遍历对比
     ans[0], dict1 = encryption(0, 0)
-    ans[1], dict2 = encryption(0, 1)
+    ans.append(FileHash())
+    ans[1].hash1 = data['hash1']
+    ans[1].hash2 = data['hash2']
+    dict2 = data['hash3']
     sort(ans[0], ans[1], dict1, dict2)
 
 
