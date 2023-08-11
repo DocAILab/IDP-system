@@ -1,5 +1,5 @@
 from paddlenlp import Taskflow
-from uie_schemas import schemas_dict_education, schemas_dict_education_D, sensitive_words
+from utils import sensitive_words, schemas_dict_education, schemas_dict_education_D
 
 class Info_Extraction:
     def __init__(self, schemas_dict= schemas_dict_education, model= 'uie-m-base', task_path= None, use_fast= True):
