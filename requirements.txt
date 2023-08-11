@@ -30,3 +30,17 @@ vc=14.2=h21ff451_1
 vs2015_runtime=14.32.31332=h1d6e394_9
 wheel=0.38.4=py38haa95532_0
 xz=5.2.6=h8d14728_0
+
+datasketch==1.5.9
+jieba==0.42.1
+nltk==3.8.1
+numpy==1.24.3
+opencv_contrib_python==4.6.0.66
+opencv_python==4.6.0.66
+openpyxl==3.1.2
+paddlenlp==2.5.2
+paddleocr==2.6.1.3
+paddleocr.egg==info
+paddlepaddle==2.4.2
+pdfplumber==0.10.0
+PyMuPDF==1.20.2
