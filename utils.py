@@ -19,6 +19,44 @@ import paddle
 import paddle.nn.functional as F
 from openpyxl import Workbook
 import time
+import pickle
+import random
+import string
+from numpy import array, uint64
+import logging
+import math
+import multiprocessing
+from utils import *
+import pathlib
+
+import difflib
+from multiprocessing import Pool, Manager
+import hashlib
+from nltk import ngrams
+from datasketch import MinHash, MinHashLSH
+import time
+
+
+class FileHash:
+    def __init__(self):
+        # domain_pred_res: 领域预测结果，str
+        # domain_pred_match_num: 领域预测结果的置信度，float
+        # words: 文件名 / 标题关键词提取结果，set 其中不包括跨领域词
+        # domain_matched: 各领域下匹配到的文本关键词，dict {领域: [文本关键词, 匹配的最佳领域词, 相似度]} 其中包括了非预测领域的结果
+        # use_other 是否使用了other
+        # file_key_word 存储schema和对应schema的结果 为string:list list中为提取出的信息
+        self.domain_pred = ""
+        self.domain_pred_match_num = 0.0
+        self.words = set()
+        self.domain_matched = {}
+        self.use_other = False
+        self.file_key_word = dict()
+
+        self.hash1 = generate_ngram_lsh_fingerprint("hash1")
+        self.hash2 = generate_ngram_lsh_fingerprint("hash2")
+        # dict {'领域':[[finger1,finger2],[finger1,finger2],[finger1,finger2]]}
+        self.hash3 = {}
+        self.hash3All = generate_ngram_lsh_fingerprint("hash3")
 
 
 # schema字典，格式：{领域: {schema类型: [具体schema关键词]}}
@@ -654,3 +692,62 @@ def extract_information(file_name, file_txt, log_base_dir, field, schemas, uie_d
     except Exception as e:
         print(ori_filename + ' [Extraction Error] : ' + str(e))
         return None, None
+
+def generate_ngram_lsh_fingerprint(text, n=1, num_perm=128, threshold=0.5):
+    """
+    使用N-gram + LSH算法生成文本的指纹（哈希值）。
+    :param text: 要生成指纹的文本。
+    :param n: N-gram的大小。
+    :param num_perm: MinHash的排列数。
+    :param threshold: LSH的阈值。
+    :return: 文本的指纹（哈希值）。
+    """
+    # 创建MinHash对象
+    minhash = MinHash(num_perm=num_perm)
+    # 创建哈希函数（可以选择MD5、SHA-1等哈希算法）
+    hash_function = hashlib.md5
+    # 生成N-gram序列
+    ngram_sequence = ngrams(text, n)
+    # 添加N-gram序列到MinHash中
+    for ngram in ngram_sequence:
+        for item in ngram:
+            minhash.update(hash_function(item.encode()).digest())
+    # 返回指纹的哈希摘要
+    fingerprint_digest = minhash.digest()
+    return fingerprint_digest
+
+
+def hash_fingerprint(fingerprint):
+    """
+    使用哈希函数对指纹进行进一步的处理。
+    :param fingerprint: 要处理的指纹。
+    :return: 处理后的指纹（哈希值）。
+    """
+    # 创建哈希函数（可以选择MD5、SHA-1、SHA-256等哈希算法）
+    hash_function = hashlib.md5
+    # 计算指纹的哈希值
+    hashed_fingerprint = hash_function(fingerprint).hexdigest()
+    return hashed_fingerprint
+
+
+def hamming_distance(fingerprint1, fingerprint2):
+    """
+    计算两个指纹之间的汉明距离。
+    :param fingerprint1: 第一个指纹。
+    :param fingerprint2: 第二个指纹。
+    :return: 汉明距离。
+    """
+    distance = sum(c1 != c2 for c1, c2 in zip(fingerprint1, fingerprint2))
+    return distance
+
+
+def calculate_similarity(fingerprint1, fingerprint2):
+    """
+    计算两个指纹之间的相似度。
+    :param fingerprint1: 第一个指纹。
+    :param fingerprint2: 第二个指纹。
+    :return: 相似度。
+    """
+    hamming_dist = hamming_distance(fingerprint1, fingerprint2)
+    similarity = 1 - (hamming_dist / len(fingerprint1))
+    return similarity
