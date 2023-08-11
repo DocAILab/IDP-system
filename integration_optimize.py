@@ -201,7 +201,11 @@ if __name__ == '__main__':
     intersection = get_intersection(intersection_path)  # 读入交集关键词，intersection.txt
 
     ## 模型加载
-    ocr = paddleocr.PaddleOCR(use_angle_cls=True, lang="ch")  # 初始化ocr模型
+    ocr = paddleocr.PaddleOCR(use_angle_cls=True, lang="ch",
+                              det_model_dir="../configuration/ocr/ch_PP-OCRv4_det_infer",
+                              rec_model_dir="../configuration/ocr/ch_PP-OCRv4_rec_infer",
+                              cls_model_dir="../configuration/ocr/ch_ppocr_mobile_v2.0_cls_infer")  # 初始化ocr模型
+    table_engine = PPStructure(table=False, ocr=False, show_log=True)  # 初始化版面识别模型
     table_engine = PPStructure(table=False, ocr=False, show_log=True)  # 初始化版面识别模型
     uie_dict = {}  # 初始化UIE模型
     for domain in schemas_dict.keys():
