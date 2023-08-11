@@ -1,5 +1,5 @@
 from paddlenlp import Taskflow
-from uie_schemas import schemas_dict_education, schemas_dict_education_D, sensitive_words
+
 import pickle
 import random
 import string
@@ -274,7 +274,6 @@ def read_pickle(file_path):
     with open(file_path, 'rb') as file:
         data = pickle.load(file)
     return data
-
 
 class Info_Extraction:
     def __init__(self, schemas_dict= schemas_dict_education, model= 'uie-m-base', task_path= None, use_fast= True):
