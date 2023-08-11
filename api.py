@@ -134,6 +134,15 @@ class Update_Keywords:
         print('交集词个数：{}'.format(intersection_num))
         print('各领域下关键词个数：{}'.format(domain_info))
 
+"""
+获取某标题的领域
+creat_index 依据领域词数据集创建索引index，保存领域词id所属领域的词典key_d
+get_domain_type 获取领域
+索引index的使用：
+搜索相邻词：D,I=index.search(nq, 5)，nq是要查询的矩阵，5表示每个词返回相似度前5的词，返回D相似度矩阵，I搜素到的领域词id矩阵
+nq的生成：每个要查询的词向量占一行，为使D返回余弦相似度，之后要对该矩阵正则化
+正则化：faiss.normalize_L2(nq)
+"""
 def creat_index(domain_keywords):
     """
         基于领域词数据集初始化faiss索引
