@@ -20,6 +20,118 @@ from datasketch import MinHash, MinHashLSH
 import time
 
 
+from paddleocr import PPStructure, paddleocr
+
+from update_keywords_table import save, create, add, delete, delete2, change, check
+from utils import get_embedding_table, get_domain_keywords, get_intersection
+
+
+class Update_Keywords:
+    def __init__(self, file_path, save_path=r'./configuration/', embedding_path=r'./configuration/100000-small-modi.txt',
+                 keywords_path=r'./configuration/domain_keywords.txt', intersection_path=r'./configuration/intersection.txt'):
+        self.file_paths = file_path
+        # {'Q': r'/usr/local/etc/ie_flow/partfile/医疗',  # industry personal sechool government
+        #               'C': r'/usr/local/etc/ie_flow/partfile/工业',
+        #               'P': r'/usr/local/etc/ie_flow/partfile/学校',
+        #               'F': r'/usr/local/etc/ie_flow/partfile/运输',
+        #               'S': r'/usr/local/etc/ie_flow/partfile/政府数据'}  # 文件夹路径
+        self.save_path =save_path# 结果存储文件夹
+        self.embedding_path = embedding_path  # 词嵌入文件目录，对应100000-small-modi.txt文件
+        self.keywords_path = keywords_path # 领域关键词文件路径，domain_keywords.txt
+        self.intersection_path = keywords_path  # 领域间关键词交集文件路径，intersection.txt
+
+    def creat(self):
+        # 创建领域词库
+        print('[create] Init...')
+        embeddings = get_embedding_table(self.embedding_path)
+        table_engine = PPStructure(table=False, ocr=False, show_log=False)
+        ocr = paddleocr.PaddleOCR(use_angle_cls=True, lang="ch")
+
+        print('Processing...')
+        domain_keywords, intersection = create(self.file_paths, embeddings, ocr=ocr, table_engine=table_engine)
+        save(self.save_path, domain_keywords, intersection)
+
+        print('领域个数：{}'.format(len(domain_keywords)))
+        print([(domain, len(words)) for domain, words in domain_keywords.items()])
+        print('Done!')
+
+    def add(self):
+        # 增加新领域/扩充旧领域词库
+        print('[add] Init...')
+        embeddings = get_embedding_table(self.embedding_path)
+        domain_keywords = get_domain_keywords(self.keywords_path)
+        intersection = get_intersection(self.intersection_path)
+        table_engine = PPStructure(table=False, ocr=False, show_log=False)
+        ocr = paddleocr.PaddleOCR(use_angle_cls=True, lang="ch")
+
+        print('Processing...')
+        print('更新前领域个数：{}'.format(len(domain_keywords)))
+        print([(domain, len(words)) for domain, words in domain_keywords.items()])
+
+        # 更新领域词
+        new_domain_keywords, new_intersection = add(self.file_paths, embeddings, domain_keywords, intersection, ocr=ocr,
+                                                    table_engine=table_engine)
+        save(self.save_path, new_domain_keywords, new_intersection)
+
+        print('更新后领域个数：{}'.format(len(new_domain_keywords)))
+        print([(domain, len(words)) for domain, words in new_domain_keywords.items()])
+        print('Done!')
+
+    def delete1(self,delete_domain):
+        # 删除某个领域
+        print('[delete1] Init...')
+        domain_keywords = get_domain_keywords(self.keywords_path)
+        intersection = get_intersection(self.intersection_path)
+        if delete(domain_keywords, delete_domain):
+            save(self.save_path, domain_keywords, intersection)
+        else:
+            print('领域名：“{}”不存在！'.format(delete_domain))
+
+        print('更新后领域个数：{}'.format(len(domain_keywords)))
+        print([(domain, len(words)) for domain, words in domain_keywords.items()])
+        print('Done!')
+
+    def delete2(self,delete_domain,delete_keywords):
+        # 删除某个领域内的领域词
+        print('[delete2] Init...')
+        domain_keywords = get_domain_keywords(self.keywords_path)
+        intersection = get_intersection(self.intersection_path)
+        if delete2(domain_keywords, delete_domain,delete_keywords):
+            save(self.save_path, domain_keywords, intersection)
+        else:
+            print('领域名：“{}”不存在！'.format(delete_domain))
+
+        print('更新后领域个数：{}'.format(len(domain_keywords)))
+        print([(domain, len(words)) for domain, words in domain_keywords.items()])
+        print('Done!')
+
+    def change(self,new_domain,old_domain):
+        # 修改领域名
+        print('[change] Init...')
+        domain_keywords = get_domain_keywords(self.keywords_path)
+        intersection = get_intersection(self.intersection_path)
+        if change(domain_keywords, old_domain,new_domain ):
+            save(self.save_path, domain_keywords, intersection)
+        else:
+            print('领域名：“{}”不存在！'.format(old_domain))
+
+        print('更新后领域个数：{}'.format(len(domain_keywords)))
+        print([(domain, len(words)) for domain, words in domain_keywords.items()])
+        print('Done!')
+
+
+   def check(self):
+        # 查看领域信息
+        print('[check] Init...')
+        domain_keywords = get_domain_keywords(self.keywords_path)
+        intersection = get_intersection(self.intersection_path)
+        domain_num, intersection_num, domain_info =check(domain_keywords, intersection)
+
+        print('领域个数：{}'.format(domain_num))
+        print('交集词个数：{}'.format(intersection_num))
+        print('各领域下关键词个数：{}'.format(domain_info))
+
+
 def encryption(mode, index):
     """
     计算单个文件的hash值。
