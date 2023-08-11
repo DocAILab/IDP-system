@@ -1,5 +1,279 @@
 from paddlenlp import Taskflow
-from utils import sensitive_words, schemas_dict_education, schemas_dict_education_D
+
+import pickle
+import random
+import string
+
+import numpy as np
+from numpy import array, uint64
+import logging
+import math
+import multiprocessing
+from utils import *
+import pathlib
+
+import difflib
+from multiprocessing import Pool, Manager
+import hashlib
+from nltk import ngrams
+from datasketch import MinHash, MinHashLSH
+import time
+
+
+def encryption(mode, index):
+    """
+    计算单个文件的hash值。
+    :param mode: 使用的hash函数 int
+    :param index: 对应文件数据在ans中的下标 int
+    :return: 填充之后的ans元素 hash3字典。
+    """
+    global ans
+    if mode == 1:
+        hashKernel = hashlib.md5()
+    elif mode == 2:
+        hashKernel = hashlib.sha1()
+    elif mode == 3:
+        hashKernel = hashlib.sha3_256()
+
+    fingerprint1 = generate_ngram_lsh_fingerprint(ans[index].domain_pred)
+    fingerprint2 = generate_ngram_lsh_fingerprint(str(ans[index].domain_pred_match_num))
+    ans[index].hash1 = fingerprint1
+    ans[index].hash2 = fingerprint2
+    print(fingerprint1)
+    tmp = {}
+    for ly in ans[index].domain_matched:
+        for word in ans[index].domain_matched[ly]:
+            if ly not in tmp:
+                tmp[ly] = [[generate_ngram_lsh_fingerprint(word[0]),
+                            generate_ngram_lsh_fingerprint(word[1])]]
+            else:
+                tmp[ly].append(
+                    [generate_ngram_lsh_fingerprint(word[0]), generate_ngram_lsh_fingerprint(word[1])])
+    return ans[index], tmp
+
+
+def sort(file_hash1, file_hash2, dict1, dict2):
+    """
+    计算两个文件之间的总相似度。
+    :param file_hash1: 存储了第一个文件相关hash信息的块 FileHash
+    :param file_hash2: 存储了第二个文件相关hash信息的块 FileHash
+    :param dict1: 存储了第一个文件相关hash3信息的字典 dict
+    :param dict1: 存储了第二个文件相关hash3信息的字典 dict
+    :return: 相似度。
+    """
+    similarity1 = calculate_similarity(file_hash1.hash1, file_hash2.hash1)
+    similarity2 = calculate_similarity(file_hash1.hash2, file_hash2.hash2)
+    three = 0
+    three_all = 0
+    four = 0
+    op1 = 0
+    op2 = 0
+    for hash_item1 in dict1:
+        for hash_item2 in dict2:
+            if hash_item1 == hash_item2:
+                a = len(dict1[hash_item1])
+                b = len(dict2[hash_item2])
+                op1 = op1 + (a <= b and a or b)
+                op2 = op2 + (a >= b and a or b)
+                for tmp1 in dict1[hash_item1]:
+                    for tmp2 in dict2[hash_item2]:
+                        if (tmp1[0] == tmp2[0]).all():
+                            three += calculate_similarity(tmp1[1], tmp2[1])
+                            print(three)
+                            three_all += 1
+    if op2 != 0:
+        four = op1 / op2
+
+    if three_all != 0:
+        ro = (similarity1 * 3) + (similarity2 * 1) + 1.0 * (three * 4) / three_all + four
+        ro = ro / 9
+    else:
+        ro = (similarity1 * 3) + (similarity2 * 1) + four
+        ro = ro / 5
+    print(similarity1)
+    print(similarity2)
+    print(three)
+    print(three_all)
+    print(four)
+    print("两文件的相似度为 :")
+    print(ro)
+
+    if ro > 0.75:
+        return "相似"
+    elif ro > 0.5:
+        return "存在关联"
+    else:
+        return "无关系"
+
+def get_file_finger(file_dir, out_dir):
+    """
+        计算文件指纹并保存至相应目录
+    :param file_dir: 输入文件路径，可为目录或单个文件 str
+    :param out_dir: 输出路径，为目录 str
+    :return: 无
+    """
+    manager = Manager()
+    ans = manager.list()
+    log_base_dir = r'D:\OCR\OCR_test\OCR_test\data'  # 结果输出路径
+    table_dir = r'D:\OCR\OCR_test\OCR_test\data'  # 表格抽取结果输出路径（若无需抽取表格，则不用填）
+
+    embedding_path = r'D:\OCR\OCR_test\OCR_test\configuration\100000-small-modi.txt'  # 词嵌入文件路径，对应100000-small-modi.txt文件
+    keywords_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_keywords.txt'  # 领域关键词文件路径，domain_keywords.txt
+    intersection_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_mapping_trade_table.txt'  # 领域间关键词交集文件路径，intersection.txt
+
+    table_extract = False  # 是否抽取表格
+    print_info = True  # 是否输出每个文件的结果信息
+    os.makedirs(log_base_dir, exist_ok=True)
+    os.makedirs(table_dir, exist_ok=True)
+
+    embeddings = get_embedding_table(embedding_path)  # 读入词嵌入，对应100000-small-modi.txt文件
+    domain_keywords = get_domain_keywords(keywords_path)  # 读入领域关键词，domain_keywords.txt
+    intersection = get_intersection(intersection_path)  # 读入交集关键词，intersection.txt
+
+    ocr = paddleocr.PaddleOCR(use_angle_cls=True, lang="ch")  # 初始化ocr模型
+    table_engine = PPStructure(table=False, ocr=False, show_log=True)  # 初始化版面识别模型
+    uie_dict = {}  # 初始化UIE模型
+    for domain in schemas_dict.keys():
+        uie_dict[domain] = {}
+        for schema_type in schemas_dict[domain].keys():
+            uie_dict[domain][schema_type] = Taskflow("information_extraction", model='uie-base',
+                                                     schema=schemas_dict[domain][schema_type])
+    if os.path.isdir(file_dir):
+        # 多文件信息抽取
+        main_for_multiprocess(file_dir, log_base_dir, embeddings, domain_keywords, intersection, ocr, table_engine,
+                              uie_dict, table_extract, table_dir, print_info)
+    else:
+        # 单个文件信息抽取
+        main(file_dir, log_base_dir, embeddings, domain_keywords, intersection, ocr, table_engine, uie_dict,
+             table_extract=table_extract, table_dir=table_dir, print_info=True)
+
+    ans[0], dict1 = encryption(0, 0)
+    ans[1], dict2 = encryption(0, 1)
+    sort(ans[0], ans[1], dict1, dict2)
+
+
+def check_file_finger(file_dir, check_file_dir, out_dir):
+    """
+        检查一批文件是否为敏感文件
+    :param file_dir: 输入文件路径，可为目录或单个文件 str
+    :param check_file_dir: 输入已保存指纹的路径 str
+    :param out_dir: 输出路径，为目录 str
+    :return: 是否为敏感文件 bool
+    """
+    manager = Manager()
+    ans = manager.list()
+    log_base_dir = r'D:\OCR\OCR_test\OCR_test\data'  # 结果输出路径
+    table_dir = r'D:\OCR\OCR_test\OCR_test\data'  # 表格抽取结果输出路径（若无需抽取表格，则不用填）
+
+    embedding_path = r'D:\OCR\OCR_test\OCR_test\configuration\100000-small-modi.txt'  # 词嵌入文件路径，对应100000-small-modi.txt文件
+    keywords_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_keywords.txt'  # 领域关键词文件路径，domain_keywords.txt
+    intersection_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_mapping_trade_table.txt'  # 领域间关键词交集文件路径，intersection.txt
+
+    table_extract = False  # 是否抽取表格
+    print_info = True  # 是否输出每个文件的结果信息
+    os.makedirs(log_base_dir, exist_ok=True)
+    os.makedirs(table_dir, exist_ok=True)
+
+    embeddings = get_embedding_table(embedding_path)  # 读入词嵌入，对应100000-small-modi.txt文件
+    domain_keywords = get_domain_keywords(keywords_path)  # 读入领域关键词，domain_keywords.txt
+    intersection = get_intersection(intersection_path)  # 读入交集关键词，intersection.txt
+
+    ocr = paddleocr.PaddleOCR(use_angle_cls=True, lang="ch")  # 初始化ocr模型
+    table_engine = PPStructure(table=False, ocr=False, show_log=True)  # 初始化版面识别模型
+    uie_dict = {}  # 初始化UIE模型
+    for domain in schemas_dict.keys():
+        uie_dict[domain] = {}
+        for schema_type in schemas_dict[domain].keys():
+            uie_dict[domain][schema_type] = Taskflow("information_extraction", model='uie-base',
+                                                     schema=schemas_dict[domain][schema_type])
+    if os.path.isdir(file_dir):
+        # 多文件信息抽取
+        main_for_multiprocess(file_dir, log_base_dir, embeddings, domain_keywords, intersection, ocr, table_engine,
+                              uie_dict, table_extract, table_dir, print_info)
+    else:
+        # 单个文件信息抽取
+        main(file_dir, log_base_dir, embeddings, domain_keywords, intersection, ocr, table_engine, uie_dict,
+             table_extract=table_extract, table_dir=table_dir, print_info=True)
+    # 读取 + 遍历对比
+    ans[0], dict1 = encryption(0, 0)
+    ans[1], dict2 = encryption(0, 1)
+    sort(ans[0], ans[1], dict1, dict2)
+
+
+def file_file_check(file_dir):
+    """
+        计算两个文件相似度
+    :param file_dir: 输入文件路径，应当为两个文件所处的目录 str
+    :return: 相似度 float
+    """
+    manager = Manager()
+    ans = manager.list()
+
+    file_dir = r'D:\OCR\OCR_test\OCR_test\data'  # 文件路径/文件夹路径
+    log_base_dir = r'D:\OCR\OCR_test\OCR_test\data'  # 结果输出路径
+    table_dir = r'D:\OCR\OCR_test\OCR_test\data'  # 表格抽取结果输出路径（若无需抽取表格，则不用填）
+
+    embedding_path = r'D:\OCR\OCR_test\OCR_test\configuration\100000-small-modi.txt'  # 词嵌入文件路径，对应100000-small-modi.txt文件
+    keywords_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_keywords.txt'  # 领域关键词文件路径，domain_keywords.txt
+    intersection_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_mapping_trade_table.txt'  # 领域间关键词交集文件路径，intersection.txt
+
+    table_extract = False  # 是否抽取表格
+    print_info = True  # 是否输出每个文件的结果信息
+
+    # 初始化
+    ## 目录创建
+    os.makedirs(log_base_dir, exist_ok=True)
+    os.makedirs(table_dir, exist_ok=True)
+
+    ## 词表读入
+    embeddings = get_embedding_table(embedding_path)  # 读入词嵌入，对应100000-small-modi.txt文件
+    domain_keywords = get_domain_keywords(keywords_path)  # 读入领域关键词，domain_keywords.txt
+    intersection = get_intersection(intersection_path)  # 读入交集关键词，intersection.txt
+
+    ## 模型加载
+    ocr = paddleocr.PaddleOCR(use_angle_cls=True, lang="ch")  # 初始化ocr模型
+    table_engine = PPStructure(table=False, ocr=False, show_log=True)  # 初始化版面识别模型
+    uie_dict = {}  # 初始化UIE模型
+    for domain in schemas_dict.keys():
+        uie_dict[domain] = {}
+        for schema_type in schemas_dict[domain].keys():
+            uie_dict[domain][schema_type] = Taskflow("information_extraction", model='uie-base',
+                                                     schema=schemas_dict[domain][schema_type])
+
+    main_for_multiprocess(file_dir, log_base_dir, embeddings, domain_keywords, intersection, ocr, table_engine,
+                          uie_dict, table_extract, table_dir, print_info)
+    ans[0], dict1 = encryption(0, 0)
+    ans[1], dict2 = encryption(0, 1)
+    sort(ans[0], ans[1], dict1, dict2)
+
+
+def write_pickle(file_directory, data):
+    """
+    将数据存储为 pickle 格式的文件，随机生成文件名。
+
+    :param file_directory:
+    :param data: 要存储的数据。
+    :return: 存储的文件路径和文件名。
+    """
+    file_name = ''.join(random.choice(string.ascii_letters) for _ in range(10)) + '.pkl'
+    file_path = os.path.join(file_directory, file_name)
+
+    with open(file_path, 'wb') as file:
+        pickle.dump(data, file)
+    return file_path, file_name
+
+
+# 定义函数，用于从 pickle 格式的文件中读取数据
+def read_pickle(file_path):
+    """
+    从 pickle 格式的文件中读取数据。
+
+    :param file_path: 要读取的文件路径。
+    :return: 读取到的数据。
+    """
+    with open(file_path, 'rb') as file:
+        data = pickle.load(file)
+    return data
 
 class Info_Extraction:
     def __init__(self, schemas_dict= schemas_dict_education, model= 'uie-m-base', task_path= None, use_fast= True):
