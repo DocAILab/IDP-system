@@ -23,7 +23,6 @@ import time
 from paddleocr import PPStructure, paddleocr
 
 from update_keywords_table import save, create, add, delete, delete2, change, check_shuju
-from utils import get_embedding_table, get_domain_keywords, get_intersection，get_embedding
 import math
 import faiss
 import numpy as np
@@ -543,8 +542,6 @@ def read_pickle(file_path):
     with open(file_path, 'rb') as file:
         data = pickle.load(file)
     return data
-from uie_schemas import schemas_dict_education, schemas_dict_education_D, sensitive_words
-from utils import *
 
 
 def read_file(file_path, ocr, table_engine, table_extract=False, table_dir=None):
