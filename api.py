@@ -546,6 +546,7 @@ def read_pickle(file_path):
 
 def read_file(file_path, ocr, table_engine, table_extract=False, table_dir=None):
     """
+        具体函数在utils.py里，这里只进行一个封装
         读入pdf/docx文件，获取文字内容
     :param file_path: 文件绝对路径
     :param ocr: OCR模型
@@ -554,25 +555,7 @@ def read_file(file_path, ocr, table_engine, table_extract=False, table_dir=None)
     :param table_dir: 表格存储目录
     :return: 原始文件名，str；提取文件名，str；文字读取结果，str
     """
-
-    if not os.path.exists(file_path):
-        raise ValueError('file path is not exist!', file_path)
-    if not os.path.isfile(file_path):
-        raise ValueError('not a correct file path!', file_path)
-    if not file_path.lower().endswith(".pdf") and not file_path.lower().endswith(".docx"):
-        raise ValueError('not a supported file type! (pdf/docx)', file_path)
-
-    # 获取无标题文件的标题
-    ori_filename, filename = get_filename(file_path, ocr, table_engine)  # 不包含后缀，且删除非法字符的文件名
-
-    # 获取文字内容
-    content = get_text(file_path, ocr)
-
-    # 单独提取表格
-    if table_extract:
-        extract_table(file_path, table_dir)
-
-    return ori_filename, filename, content
+    return read_file(file_path, ocr, table_engine, table_extract=table_extract, table_dir=table_dir)
 
 
 class Info_Extraction:
