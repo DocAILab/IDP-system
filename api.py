@@ -58,9 +58,10 @@ class Update_Keywords:
         print([(domain, len(words)) for domain, words in domain_keywords.items()])
         print('Done!')
 
-    def add(self):
+    def add(self,file_path):
         # 增加新领域/扩充旧领域词库
         print('[add] Init...')
+       self.file_paths = file_path
         embeddings = get_embedding_table(self.embedding_path)
         domain_keywords = get_domain_keywords(self.keywords_path)
         intersection = get_intersection(self.intersection_path)
