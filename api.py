@@ -385,7 +385,7 @@ def get_file_finger(file_dir, out_dir):
 
     embedding_path = r'D:\OCR\OCR_test\OCR_test\configuration\100000-small-modi.txt'  # 词嵌入文件路径，对应100000-small-modi.txt文件
     keywords_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_keywords.txt'  # 领域关键词文件路径，domain_keywords.txt
-    intersection_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_mapping_trade_table.txt'  # 领域间关键词交集文件路径，intersection.txt
+    intersection_path = r'D:\OCR\OCR_test\OCR_test\configuration\intersection.txt'  # 领域间关键词交集文件路径，intersection.txt
 
     table_extract = False  # 是否抽取表格
     print_info = True  # 是否输出每个文件的结果信息
@@ -433,7 +433,7 @@ def check_file_finger(file_dir, check_file_dir, out_dir):
 
     embedding_path = r'D:\OCR\OCR_test\OCR_test\configuration\100000-small-modi.txt'  # 词嵌入文件路径，对应100000-small-modi.txt文件
     keywords_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_keywords.txt'  # 领域关键词文件路径，domain_keywords.txt
-    intersection_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_mapping_trade_table.txt'  # 领域间关键词交集文件路径，intersection.txt
+    intersection_path = r'D:\OCR\OCR_test\OCR_test\configuration\intersection.txt'  # 领域间关键词交集文件路径，intersection.txt
 
     table_extract = False  # 是否抽取表格
     print_info = True  # 是否输出每个文件的结果信息
@@ -484,7 +484,7 @@ def file_file_check(file_dir):
 
     embedding_path = r'D:\OCR\OCR_test\OCR_test\configuration\100000-small-modi.txt'  # 词嵌入文件路径，对应100000-small-modi.txt文件
     keywords_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_keywords.txt'  # 领域关键词文件路径，domain_keywords.txt
-    intersection_path = r'D:\OCR\OCR_test\OCR_test\configuration\domain_mapping_trade_table.txt'  # 领域间关键词交集文件路径，intersection.txt
+    intersection_path = r'D:\OCR\OCR_test\OCR_test\configuration\intersection.txt'  # 领域间关键词交集文件路径，intersection.txt
 
     table_extract = False  # 是否抽取表格
     print_info = True  # 是否输出每个文件的结果信息
