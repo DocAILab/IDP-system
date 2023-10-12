@@ -63,9 +63,7 @@
 pip install -r requirements.txt
 ```
 
-**安装流程：**
-
-TODO 上述安装方法有错误，先按如下流程安装（依旧不全，且有部分错误，需要根据具体代码报错来修改）：
+主要组件的安装细节：
 
 1. `pip install paddlepaddle-gpu==2.4.2 -i https://pypi.tuna.tsinghua.edu.cn/simple`
    
@@ -77,11 +75,6 @@ TODO 上述安装方法有错误，先按如下流程安装（依旧不全，且
 	```	
 2. `pip install paddleocr==2.7.0.2`
 3. `pip install paddlenlp==2.5.2`
-4. `pip install fast-tokenizer-python==1.0.2`（似乎使用时有些错误）
-5. `pip install faiss-cpu==1.7.2`
-   
-	非AVX指令集安装：
-		`pip install faiss-cpu-noavx2`
 
 ## 使用的模型
 
