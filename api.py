@@ -9,6 +9,7 @@ from numpy import array, uint64
 import logging
 import math
 import multiprocessing
+import utils
 from utils import *
 import pathlib
 
@@ -556,7 +557,7 @@ def read_file(file_path, ocr, table_engine, table_extract=False, table_dir=None)
     :param table_dir: 表格存储目录
     :return: 原始文件名，str；提取文件名，str；文字读取结果，str
     """
-    return read_file(file_path, ocr, table_engine, table_extract=table_extract, table_dir=table_dir)
+    return utils.read_file(file_path, ocr, table_engine, table_extract=table_extract, table_dir=table_dir)
 
 
 class Info_Extraction:
