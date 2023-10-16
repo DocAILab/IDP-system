@@ -63,9 +63,9 @@
 pip install -r requirements.txt
 ```
 
-主要组件的安装细节：
+注：尽量优先安装如下的包，再运行上述requirements：
 
-1. `pip install paddlepaddle-gpu==2.4.2 -i https://pypi.tuna.tsinghua.edu.cn/simple`
+1. gpu环境下安装的包（不兼容cpu）：`pip install paddlepaddle-gpu==2.4.2 -i https://pypi.tuna.tsinghua.edu.cn/simple`
    
 	非AVX指令集安装：
 	```
@@ -73,8 +73,9 @@ pip install -r requirements.txt
 	paddlepaddle_gpu-2.4.2-cp38-cp38-win_amd64.whl：https://www.paddlepaddle.org.cn/whl/windows/mkl/noavx/stable.html
 	pip install paddlepaddle_gpu-2.4.2-cp38-cp38-win_amd64.whl.whl
 	```	
-2. `pip install paddleocr==2.7.0.2`
-3. `pip install paddlenlp==2.5.2`
+2. cpu环境下安装的包：`pip install paddlepaddle==2.4.2 -i https://pypi.tuna.tsinghua.edu.cn/simple`
+3. `pip install paddleocr==2.7.0.2`
+4. `pip install paddlenlp==2.5.2`
 
 ## 使用的模型
 
@@ -157,7 +158,7 @@ read_file("./test/1.pdf",ocr,table_engine,table_extract=True,table_dir="./test/e
 ```python
 keyword = get_domain_keywords(keywords_path)  # 读入领域词表
 index, key_d = creat_index(keyword)  # 创建领域词表索引
-domain_pred, simi, words = get_domain_type(text,embeddings,intersection,index,key_d)  # 预测领域分类结果
+domain_pred, simi, words = get_domain_type(text,embeddings,keywords,intersection,index,key_d)  # 预测领域分类结果
 ```
 
 #### `creat_index`
